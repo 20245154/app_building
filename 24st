@@ -1,0 +1,386 @@
+import 'package:flutter/material.dart';
+
+class TakenCourse {
+  final String name;
+  final int credit;
+  TakenCourse({required this.name, required this.credit});
+}
+
+class St24Screen extends StatefulWidget {
+  final String studentId;
+  final Function(int totalAll, Map<String, int> creditDetails) onSave;
+
+  const St24Screen({
+    super.key,
+    required this.studentId,
+    required this.onSave,
+  });
+
+  @override
+  State<St24Screen> createState() => _St24ScreenState();
+}
+
+class _St24ScreenState extends State<St24Screen> {
+  final List<TakenCourse> _gKyoCourses = [];
+  final List<TakenCourse> _hKyoCourses = [];
+  final List<TakenCourse> _commCourses = [];
+  final List<TakenCourse> _insungCourses = [];
+  final List<TakenCourse> _sKyoCourses = [];
+  final List<TakenCourse> _gyojikCourses = [];
+  final List<TakenCourse> _jPilCourses = [];
+  final List<TakenCourse> _jSunCourses = [];
+
+  // 💡 [새로 추가] 각 섹션의 접힘/펼침 상태를 관리하는 Map (기본값은 펼침: true)
+  final Map<String, bool> _sectionExpanded = {
+    "기초교양": true,
+    "핵심교양": true,
+    "공통교양 - 의사소통": true,
+    "공통교양 - 인성": true,
+    "심화교양": true,
+    "교직 학점": true,
+    "전공 필수": true,
+    "전공 선택": true,
+  };
+
+  int _calculateCategoryTotal(List<TakenCourse> courses) {
+    return courses.fold(0, (sum, item) => sum + item.credit);
+  }
+
+  void _showAddSubjectDialog(String categoryTitle, List<TakenCourse> targetList) {
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController creditController = TextEditingController();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text("[$categoryTitle] 과목 추가", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: "과목명", hintText: "예) 프로그래밍기초", floatingLabelBehavior: FloatingLabelBehavior.always),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: creditController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: "이수 학점", hintText: "예) 3", floatingLabelBehavior: FloatingLabelBehavior.always, suffixText: "학점"),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("취소", style: TextStyle(color: Colors.black45, fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF005BAA), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+              onPressed: () {
+                final String name = nameController.text.trim();
+                final int? credit = int.tryParse(creditController.text.trim());
+
+                if (name.isEmpty || credit == null || credit <= 0) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("올바른 과목명과 학점을 입력해 주세요.")));
+                  return;
+                }
+
+                setState(() {
+                  targetList.add(TakenCourse(name: name, credit: credit));
+                  // 💡 과목을 추가할 때는 리스트를 자동으로 펼쳐서 보여줍니다.
+                  _sectionExpanded[categoryTitle] = true;
+                });
+                Navigator.pop(context);
+              },
+              child: const Text("추가"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusBadge(String type, int current) {
+    String statusText = "미달";
+    Color badgeColor = const Color(0xFFEF4444);
+
+    if (type == "기초교양") {
+      if (current == 5) { statusText = "충족"; badgeColor = const Color(0xFF10B981); }
+      else if (current > 5) { statusText = "범위초과"; badgeColor = const Color(0xFFF59E0B); }
+    }
+    else if (type == "핵심교양") {
+      if (current == 6) { statusText = "충족"; badgeColor = const Color(0xFF10B981); }
+      else if (current > 6) { statusText = "범위초과"; badgeColor = const Color(0xFFF59E0B); }
+    }
+    else if (type == "의사소통") {
+      if (current == 2) { statusText = "충족"; badgeColor = const Color(0xFF10B981); }
+      else if (current > 2) { statusText = "범위초과"; badgeColor = const Color(0xFFF59E0B); }
+    }
+    else if (type == "인성") {
+      if (current == 2) { statusText = "충족"; badgeColor = const Color(0xFF10B981); }
+      else if (current > 2) { statusText = "범위초과"; badgeColor = const Color(0xFFF59E0B); }
+    }
+    else if (type == "심화교양") {
+      if (current >= 15 && current <= 31) { statusText = "충족"; badgeColor = const Color(0xFF10B981); }
+      else if (current > 31) { statusText = "범위초과"; badgeColor = const Color(0xFFF59E0B); }
+    }
+    else if (type == "교직") {
+      if (current == 22) { statusText = "충족"; badgeColor = const Color(0xFF10B981); }
+      else if (current > 22) { statusText = "범위초과"; badgeColor = const Color(0xFFF59E0B); }
+    }
+    else if (type == "전공필수") {
+      if (current <= 40 && current > 0) { statusText = "조건충족"; badgeColor = const Color(0xFF10B981); }
+      else if (current > 40) { statusText = "기준초과"; badgeColor = const Color(0xFFEF4444); }
+    }
+    else if (type == "전공총합") {
+      if (current >= 74) { statusText = "충족"; badgeColor = const Color(0xFF10B981); }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(color: badgeColor.withOpacity(0.1), borderRadius: BorderRadius.circular(6), border: Border.all(color: badgeColor, width: 1)),
+      child: Text(statusText, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: badgeColor)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    int gKyo = _calculateCategoryTotal(_gKyoCourses);
+    int hKyo = _calculateCategoryTotal(_hKyoCourses);
+    int comm = _calculateCategoryTotal(_commCourses);
+    int insung = _calculateCategoryTotal(_insungCourses);
+    int sKyo = _calculateCategoryTotal(_sKyoCourses);
+    int gyojik = _calculateCategoryTotal(_gyojikCourses);
+    int jPil = _calculateCategoryTotal(_jPilCourses);
+    int jSun = _calculateCategoryTotal(_jSunCourses);
+
+    int totalMajor = jPil + jSun;
+    int totalAll = gKyo + hKyo + comm + insung + sKyo + gyojik + jPil + jSun;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6F9),
+      appBar: AppBar(
+        title: Text("${widget.studentId} 이수 과목 기입", style: const TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF005BAA),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(18.0),
+              decoration: BoxDecoration(color: const Color(0xFF005BAA), borderRadius: BorderRadius.circular(16)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("실시간 기입 총학점", style: TextStyle(color: Colors.white70, fontSize: 15, fontWeight: FontWeight.w500)),
+                      SizedBox(height: 4),
+                      Text("졸업 기준 요건 : 140학점", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w400)),
+                    ],
+                  ),
+                  Text("$totalAll / 140 점", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: totalAll >= 140 ? const Color(0xFFF1C40F) : Colors.white))
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  child: Column(
+                    children: [
+                      _buildCategorySection("기초교양", "기준: 5학점", _gKyoCourses, "기초교양", gKyo),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildCategorySection("핵심교양", "기준: 6학점", _hKyoCourses, "핵심교양", hKyo),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildCategorySection("공통교양 - 의사소통", "기준: 2학점", _commCourses, "의사소통", comm),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildCategorySection("공통교양 - 인성", "기준: 2학점", _insungCourses, "인성", insung),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildCategorySection("심화교양", "기준: 15~31학점", _sKyoCourses, "심화교양", sKyo),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildCategorySection("교직 학점", "기준: 22학점", _gyojikCourses, "교직", gyojik),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildCategorySection("전공 필수", "기준: 40학점 이하", _jPilCourses, "전공필수", jPil),
+                      const Divider(height: 1, indent: 16, endIndent: 16),
+                      _buildCategorySection("전공 선택", "자유 입력", _jSunCourses, "기타", jSun),
+                      const Divider(height: 1, thickness: 1.5, color: Colors.black12),
+                      _buildReadOnlyMajorRow("전공 총합(전필+전선)", "기준: 74학점 이상", totalMajor, "전공총합"),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFF94A3B8), width: 1.5), foregroundColor: const Color(0xFF475569), padding: const EdgeInsets.symmetric(vertical: 16.0), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("취소", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF005BAA), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(vertical: 16.0), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
+                      onPressed: () {
+                        widget.onSave(totalAll, {
+                          'gKyo': gKyo, 'hKyo': hKyo, 'comm': comm, 'insung': insung,
+                          'sKyo': sKyo, 'gyojik': gyojik, 'jPil': jPil, 'jSun': jSun,
+                          'totalMajor': totalMajor
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: const Text("저장", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategorySection(String title, String subtitle, List<TakenCourse> courses, String checkType, int currentVal) {
+    // 💡 현재 해당 카테고리가 열려있는지 닫혀있는지 상태 체크
+    bool isExpanded = _sectionExpanded[title] ?? true;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 💡 타이틀 영역 전체에 탭 제스처 감지 추가
+          InkWell(
+            onTap: () {
+              setState(() {
+                _sectionExpanded[title] = !isExpanded;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 6.0),
+              child: Row(
+                children: [
+                  // 💡 접기/펴기 상태를 나타내는 화살표 아이콘 배치
+                  Icon(
+                    isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                    color: Colors.black45,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+                        const SizedBox(height: 2),
+                        Text(subtitle, style: const TextStyle(fontSize: 13, color: Colors.black45)),
+                      ],
+                    ),
+                  ),
+                  if (checkType != "기타") ...[
+                    _buildStatusBadge(checkType, currentVal),
+                    const SizedBox(width: 12),
+                  ],
+                  Text("$currentVal 점", style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF005BAA))),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: const Icon(Icons.add_circle_rounded, color: Color(0xFF005BAA), size: 28),
+                    onPressed: () => _showAddSubjectDialog(title, courses),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 💡 과목이 있고, '펼침(isExpanded가 true)' 상태일 때만 리스트를 렌더링하도록 조건식 수정
+          if (courses.isNotEmpty && isExpanded)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
+              child: Column(
+                children: courses.map((course) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.lens, size: 6, color: Colors.black38),
+                            const SizedBox(width: 8),
+                            Text(course.name, style: const TextStyle(fontSize: 14, color: Color(0xFF334155), fontWeight: FontWeight.w500)),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Text("${course.credit}학점", style: const TextStyle(fontSize: 14, color: Color(0xFF475569))),
+                            const SizedBox(width: 4),
+                            IconButton(
+                              constraints: const BoxConstraints(),
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFEF4444)),
+                              onPressed: () {
+                                setState(() {
+                                  courses.remove(course);
+                                });
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyMajorRow(String title, String subtitle, int totalVal, String checkType) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1E293B))),
+              const SizedBox(height: 2),
+              Text(subtitle, style: const TextStyle(fontSize: 13, color: Colors.black45)),
+            ],
+          ),
+          Row(
+            children: [
+              _buildStatusBadge(checkType, totalVal),
+              const SizedBox(width: 24),
+              Padding(
+                padding: const EdgeInsets.only(right: 12.0),
+                child: Text("$totalVal 점", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF005BAA))),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+}
